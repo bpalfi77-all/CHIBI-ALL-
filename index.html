@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>Tap Monster — Alfi (2.5D Top-Down)</title>
+<style>
+:root{
+  --bg1:#041422; --bg2:#061a2a; --accent:#6fe7ff; --accent2:#b07dff; --gold:#ffd85c;
+  --glass: rgba(255,255,255,0.03); --ui:#dff6ff;
+  --btn-bg: linear-gradient(180deg,#0f1720,#01121a);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:linear-gradient(180deg,var(--bg1),var(--bg2));font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--ui);overflow:hidden}
+#topRightLabel{
+  position:fixed; right:12px; top:10px; z-index:1600; font-weight:900; color:#fff;
+  background:rgba(0,0,0,0.22); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.04);
+  display:flex; flex-direction:column; align-items:flex-end; pointer-events:none;
+}
+#topRightLabel small{font-weight:700; font-size:11px; color:#d7f6ff; opacity:0.9}
+
+/* Loading overlay */
+#loadingOverlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:2000; background:linear-gradient(180deg, rgba(0,0,0,0.96), rgba(0,0,0,0.96))}
+#loadingCard{width:min(980px,92vw); background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); padding:18px; border-radius:12px; display:flex; gap:18px; align-items:center}
+.loading-svg{width:260px;height:260px; display:flex;align-items:center;justify-content:center}
+
+/* App layout */
+#appRoot{position:fixed; inset:0; display:flex; gap:12px; padding:12px; opacity:0; pointer-events:none; transition:opacity 420ms ease}
+.stage{flex:1; position:relative; border-radius:12px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,0.5)}
+canvas#gameCanvas{width:100%; height:100%; display:block}
+
+/* HUD */
+#hudTopLeft{position:absolute; left:12px; top:12px; z-index:120}
+#menuBtn{background:var(--glass); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); cursor:pointer; color:var(--ui); font-weight:900; box-shadow:0 8px 20px rgba(0,0,0,0.5)}
+#playerInfo{position:absolute; right:12px; top:12px; z-index:120; display:flex; gap:10px; align-items:center; pointer-events:none}
+.barWrap{background:rgba(0,0,0,0.44); border-radius:10px; padding:8px; min-width:260px; border:1px solid rgba(255,255,255,0.03)}
+.barTitle{font-size:12px; color:#cfeef2; font-weight:800}
+.hpbar{height:12px;background:rgba(255,255,255,0.03); border-radius:8px; overflow:hidden; margin-top:6px}
+.hpfill{height:100%; width:100%; background:linear-gradient(90deg,#ff6b6b,#ffb86b); transition:width 160ms linear}
+.epwrap{height:8px;background:rgba(255,255,255,0.03); border-radius:8px; overflow:hidden; margin-top:6px}
+.epfill{height:100%; width:100%; background:linear-gradient(90deg,#6fe7ff,#35aaff); transition:width 120ms linear}
+
+/* weapon slot */
+.weaponSlot{margin-left:10px; background:rgba(255,255,255,0.02); padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); display:flex; align-items:center; gap:8px}
+.weaponSlot button{background:linear-gradient(90deg,#ffffff11,#ffffff05); border:none; padding:6px 8px; border-radius:8px; cursor:pointer; font-weight:900; color:var(--ui)}
+
+/* controls */
+#controlsBottom{position:absolute; right:18px; bottom:18px; z-index:120; display:flex; flex-direction:column; gap:10px; align-items:flex-end; pointer-events:auto}
+.skillRow{display:flex; gap:10px}
+.skillBtn{
+  width:74px; height:74px; border-radius:14px; background:var(--btn-bg); border:1px solid rgba(255,255,255,0.04);
+  display:flex; align-items:center; justify-content:center; font-weight:900; cursor:pointer; color:#eaf; box-shadow:0 8px 26px rgba(0,0,0,0.5); position:relative;
+}
+.skillBtn svg{width:34px;height:34px}
+.cool{opacity:0.5; transform:scale(0.98)}
+.coolOverlay{position:absolute; left:0; top:0; width:100%; height:100%; border-radius:14px; background:rgba(0,0,0,0.45); clip-path: inset(100% 0 0 0); transition:clip-path 200ms linear}
+
+/* joystick */
+#joystick{position:absolute; left:18px; bottom:18px; width:170px; height:170px; border-radius:50%; background:rgba(255,255,255,0.02); display:flex; align-items:center; justify-content:center; z-index:120; touch-action:none; border:1px solid rgba(255,255,255,0.03)}
+#joyInner{width:70px;height:70px;border-radius:50%; background:rgba(255,255,255,0.06); transform:translate(0,0)}
+
+/* attack button */
+#attackBtn{position:absolute; right:110px; bottom:24px; z-index:121; width:86px; height:86px; border-radius:999px; background:linear-gradient(180deg,#ff6b6b,#ffb86b); display:flex; align-items:center; justify-content:center; font-weight:900; color:#031; box-shadow:0 18px 40px rgba(255,120,80,0.14); border:0; cursor:pointer}
+#attackBtn svg{width:36px;height:36px}
+
+/* right panel info */
+.rightPanel{width:360px; max-width:360px; display:flex; flex-direction:column; gap:12px; padding:12px; pointer-events:auto}
+.panelCard{background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.03)}
+
+/* menu modal */
+#menuModal{position:fixed; left:12px; top:68px; z-index:1400; width:340px; max-width:86vw; display:none; background:linear-gradient(180deg, rgba(3,8,15,0.98), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; border:1px solid rgba(255,255,255,0.04)}
+.menuRow{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px}
+.closeMenu{background:transparent;border:1px solid rgba(255,255,255,0.03); padding:6px;border-radius:8px; cursor:pointer}
+
+/* responsive adjustments */
+@media(max-width:980px){ .rightPanel{display:none} #appRoot{padding:6px} #topRightLabel{right:6px;top:6px;padding:6px 8px} #menuModal{left:6px;top:56px} }
+</style>
+</head>
+<body>
+
+<!-- Top label -->
+<div id="topRightLabel">ALFI BINTANG PRATAMA<small>Tap Monster • 2.5D</small></div>
+
+<!-- Loading -->
+<div id="loadingOverlay" aria-hidden="false">
+  <div id="loadingCard" role="dialog">
+    <div class="loading-svg" aria-hidden>
+      <!-- small chibi + slime SVG animated -->
+      <svg viewBox="0 0 240 240" width="240" height="240">
+        <defs>
+          <linearGradient id="pl" x1="0" x2="1"><stop offset="0" stop-color="#e6f7ff"/><stop offset="1" stop-color="#cfeaff"/></linearGradient>
+          <radialGradient id="slg"><stop offset="0" stop-color="#9fffdc"/><stop offset="1" stop-color="#5ff8d1"/></radialGradient>
+        </defs>
+        <g transform="translate(120,120)">
+          <g class="player" style="transform-origin:120px 120px;">
+            <circle cx="-40" cy="10" r="28" fill="url(#pl)"/>
+            <circle cx="-69" cy="22" r="6" fill="#e6f7ff"/>
+            <circle cx="-11" cy="22" r="6" fill="#e6f7ff"/>
+            <rect x="-20" y="-6" width="44" height="6" rx="3" fill="#cfd8e3" transform="rotate(12)"/>
+          </g>
+          <g class="slime" transform="translate(48,8)">
+            <path d="M-56,6 Q-40,-60 0,-72 Q40,-60 56,6 Q24,53 0,58 Q-24,53 -56,6Z" fill="url(#slg)" stroke="#5ff8d1" stroke-width="3"/>
+            <circle cx="-16" cy="-6" r="6" fill="#fff"/><circle cx="-16" cy="-4" r="2" fill="#012"/>
+            <circle cx="16" cy="-6" r="6" fill="#fff"/><circle cx="16" cy="-4" r="2" fill="#012"/>
+          </g>
+        </g>
+        <style>
+          .player{animation:breathe 1500ms ease-in-out infinite}
+          .slime{animation:slime 1400ms cubic-bezier(.2,.9,.2,1) infinite}
+          @keyframes breathe{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+          @keyframes slime{0%{transform:translateY(0) scale(1)}50%{transform:translateY(-8px) scale(1.02)}100%{transform:translateY(0) scale(1)}}
+        </style>
+      </svg>
+    </div>
+    <div style="flex:1">
+      <div style="font-weight:900;font-size:18px;color:var(--accent)">Mempersiapkan Dunia — Mohon Tunggu</div>
+      <div style="margin-top:8px;color:#cfe">Memuat engine kode & efek. Semua dibuat langsung dari script.</div>
+      <div style="margin-top:12px"><div style="height:12px;background:rgba(255,255,255,0.03);border-radius:10px;overflow:hidden"><div id="progressFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width 220ms linear"></div></div></div>
+      <div style="margin-top:8px;font-weight:800;color:#dfe">Loading: <span id="progressText">0%</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appRoot" aria-hidden="true">
+  <div class="stage">
+    <canvas id="gameCanvas" aria-label="Game canvas"></canvas>
+
+    <!-- HUD left -->
+    <div id="hudTopLeft"><button id="menuBtn" aria-label="Menu">☰</button></div>
+
+    <!-- Top-right -->
+    <div id="playerInfo">
+      <div class="barWrap">
+        <div class="barTitle" id="playerName">ALFI BINTANG PRATAMA</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:8px">
+          <div style="flex:1; pointer-events:none">
+            <div class="hpbar"><div id="playerHP" class="hpfill"></div></div>
+            <div class="epwrap"><div id="playerEP" class="epfill"></div></div>
+          </div>
+          <div class="weaponSlot" aria-hidden>
+            <div style="font-weight:900">Weapon</div>
+            <button id="switchWeaponBtn">Sword</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack button -->
+    <button id="attackBtn" aria-label="Attack">
+      <!-- sword icon -->
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 21l18-18" stroke="#031" stroke-width="2.2" stroke-linecap="round"/><path d="M12 2l10 10" stroke="#031" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+
+    <!-- Skill buttons -->
+    <div id="controlsBottom">
+      <div class="skillRow">
+        <div class="skillBtn" id="skill1" aria-label="Skill 1"><svg viewBox="0 0 24 24"><path d="M12 2v20" stroke="#aaf" stroke-width="2" stroke-linecap="round"/></svg><div class="coolOverlay" id="cd1"></div></div>
+        <div class="skillBtn" id="skill2" aria-label="Skill 2"><svg viewBox="0 0 24 24"><path d="M2 12h20" stroke="#f9b" stroke-width="2" stroke-linecap="round"/></svg><div class="coolOverlay" id="cd2"></div></div>
+        <div class="skillBtn" id="ultimate" aria-label="Ultimate"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#ffd" stroke-width="2" fill="none"/></svg><div class="coolOverlay" id="cd3"></div></div>
+      </div>
+    </div>
+
+    <!-- Joystick -->
+    <div id="joystick" aria-hidden><div id="joyInner"></div></div>
+
+    <!-- right-side (info, upgrades) -->
+    <div class="rightPanel" aria-hidden>
+      <div class="panelCard">
+        <h4 style="color:var(--accent)">World</h4>
+        <div>Level: <span id="uiLevel">1</span></div>
+        <div>Gold: <span id="uiGold">0</span></div>
+        <div id="killCounter" style="margin-top:8px">Monsters defeated: 0</div>
+      </div>
+      <div class="panelCard">
+        <h4 style="color:var(--accent)">Upgrades</h4>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <button id="buyAtk" style="padding:8px;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--accent2));border:none;color:#062;font-weight:900">+ Atk (30)</button>
+          <button id="buyHP" style="padding:8px;border-radius:8px;background:linear-gradient(90deg,#ffcc77,#ff9b6b);border:none;color:#281;font-weight:900">+ HP (30)</button>
+        </div>
+        <div style="margin-top:12px"><button id="openModelLoad" style="padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--ui);cursor:pointer">Load 3D Model (.glb)</button></div>
+      </div>
+      <div class="panelCard">
+        <h4 style="color:var(--accent)">Help</h4>
+        <div style="font-size:13px">Joystick kiri bawah • Attack (tombol merah) • Skill kanan bawah • Menu ☰ kiri atas</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Menu modal -->
+<div id="menuModal" role="dialog" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-weight:900">Upgrade & Equipment</div>
+    <button class="closeMenu" id="closeMenu">X</button>
+  </div>
+  <div class="menuRow"><div><strong>Attack</strong><div style="font-size:12px;color:#cfe">Tambah damage</div></div><div><button id="menuBuyAtk" class="btn">Beli 30</button></div></div>
+  <div class="menuRow"><div><strong>Max HP</strong><div style="font-size:12px;color:#cfe">Tambah ketahanan</div></div><div><button id="menuBuyHP" class="btn">Beli 30</button></div></div>
+  <div class="menuRow"><div><strong>Equip</strong><div style="font-size:12px;color:#cfe">Ganti Weapon</div></div><div><button id="equipSword" class="btn">Equip</button></div></div>
+</div>
+
+<!-- Hidden file input for future 3D model -->
+<input type="file" id="fileGLB" accept=".glb,.gltf" style="display:none"/>
+
+<script>
+/* =========================
+   Core: 2.5D top-down game
+   All rendering via canvas; UI via DOM.
+   ========================= */
+const loadingOverlay = document.getElementById('loadingOverlay');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const appRoot = document.getElementById('appRoot');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function fitCanvas(){
+  // prefer landscape feel: fill window
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  canvas.width = Math.floor(w * devicePixelRatio);
+  canvas.height = Math.floor(h * devicePixelRatio);
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
+
+/* -----------------------
+   Simple loading simulation
+   ----------------------- */
+async function doLoad(){
+  const steps = [
+    {name:'Init engine', t:180},
+    {name:'Build UI', t:160},
+    {name:'Prepare canvas', t:120},
+    {name:'Audio & particles', t:160},
+    {name:'Spawn world', t:200}
+  ];
+  let total = steps.reduce((s,i)=>s+i.t,0), elapsed=0;
+  for(const s of steps){
+    const ticks = Math.max(6, Math.floor(s.t/35));
+    for(let i=0;i<ticks;i++){
+      await new Promise(r=>setTimeout(r, Math.floor(s.t/ticks)));
+      elapsed += s.t / ticks;
+      const p = Math.round((elapsed/total) * 100);
+      progressFill.style.width = p + '%'; progressText.textContent = p + '%';
+    }
+  }
+  progressFill.style.width = '100%'; progressText.textContent = '100%';
+  await new Promise(r=>setTimeout(r, 350));
+  loadingOverlay.style.display = 'none';
+  appRoot.style.opacity = 1; appRoot.style.pointerEvents = 'auto';
+}
+doLoad();
+
+/* -----------------------
+   Input & joystick
+   ----------------------- */
+const input = {left:false,right:false,up:false,down:false,attack:false};
+window.addEventListener('keydown', e=>{
+  if(e.key==='a'||e.key==='A') input.left=true;
+  if(e.key==='d'||e.key==='D') input.right=true;
+  if(e.key==='w'||e.key==='W') input.up=true;
+  if(e.key==='s'||e.key==='S') input.down=true;
+  if(e.key===' ') input.attack=true;
+  if(e.key==='1') triggerSkill(1);
+  if(e.key==='2') triggerSkill(2);
+  if(e.key==='u' || e.key==='U') triggerSkill('ult');
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='a'||e.key==='A') input.left=false;
+  if(e.key==='d'||e.key==='D') input.right=false;
+  if(e.key==='w'||e.key==='W') input.up=false;
+  if(e.key==='s'||e.key==='S') input.down=false;
+  if(e.key===' ') input.attack=false;
+});
+
+/* Joystick handling */
+const joystick = document.getElementById('joystick');
+const joyInner = document.getElementById('joyInner');
+let joyActive=false, joyCenter=null, joyPos={x:0,y:0};
+joystick.addEventListener('pointerdown', (ev)=>{
+  joystick.setPointerCapture(ev.pointerId);
+  joyActive = true;
+  joyCenter = {x: joystick.clientWidth/2, y: joystick.clientHeight/2};
+});
+joystick.addEventListener('pointerup', (ev)=>{
+  joyActive = false;
+  joyInner.style.transform = 'translate(0px,0px)';
+  joyPos = {x:0,y:0};
+  input.left = input.right = input.up = input.down = false;
+});
+joystick.addEventListener('pointermove', (ev)=>{
+  if(!joyActive) return;
+  const r = joystick.getBoundingClientRect();
+  const x = ev.clientX - r.left;
+  const y = ev.clientY - r.top;
+  let dx = x - joyCenter.x, dy = y - joyCenter.y;
+  const max = joyCenter.x - 12;
+  const d = Math.hypot(dx,dy);
+  if(d > max){ dx = dx/d * max; dy = dy/d * max; }
+  joyInner.style.transform = `translate(${dx}px, ${dy}px)`;
+  joyPos.x = dx / max; joyPos.y = dy / max;
+  input.left = joyPos.x < -0.28;
+  input.right = joyPos.x > 0.28;
+  input.up = joyPos.y < -0.28;
+  input.down = joyPos.y > 0.28;
+});
+
+/* -----------------------
+   Audio (WebAudio simple)
+   ----------------------- */
+let audioCtx = null;
+function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function playSound(freq=440, time=0.12, type='sine', vol=0.06){
+  try{
+    ensureAudio();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + time);
+    setTimeout(()=> o.stop(), time*1000 + 30);
+  }catch(e){}
+}
+
+/* -----------------------
+   Game state
+   ----------------------- */
+const state = { level:1, gold:0, kills:0 };
+const player = {
+  x: 900, y: 520, r:20, vx:0, vy:0, speed:240,
+  hp:150, maxHP:150, ep:100, maxEP:100, atk:20,
+  regenEP:16, cooldowns:{skill1:0, skill2:0, ult:0}
+};
+let monster = spawnMonster(player.x + 260, player.y + 18);
+const cam = {x:player.x, y:player.y, shakeX:0, shakeY:0};
+let particles = [];
+
+/* -----------------------
+   Spawning / Entities
+   ----------------------- */
+function spawnMonster(x,y){
+  return { x:x, y:y, r:36, hp:150, maxHP:150, atk:12, speed:70, alive:true, state:'idle', burn:0, slow:0 };
+}
+
+/* -----------------------
+   Particles
+   ----------------------- */
+function spawnParticles(x,y,color,amount=20,spread=32){
+  for(let i=0;i<amount;i++){
+    particles.push({
+      x: x + rand(-spread,spread), y: y + rand(-spread,spread),
+      vx: rand(-2.4,2.4), vy: rand(-4,-0.8), life:40 + Math.random()*30, size: 3 + Math.random()*6, color
+    });
+  }
+}
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.vy += 0.12;
+    p.x += p.vx; p.y += p.vy; p.life--; p.size *= 0.995;
+    if(p.life <= 0 || p.size < 0.2) particles.splice(i,1);
+  }
+}
+function drawParticles(){
+  for(const p of particles){
+    const sx = p.x - cam.x + canvas.clientWidth/2;
+    const sy = p.y - cam.y + canvas.clientHeight/2;
+    ctx.globalAlpha = clamp(p.life/80,0,1);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(sx, sy, p.size, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* -----------------------
+   Skills & combat
+   ----------------------- */
+function triggerSkill(k){
+  if(k===1){
+    if(player.cooldowns.skill1 <= 0 && player.ep >= 14){
+      player.ep -= 14; player.cooldowns.skill1 = 3.2;
+      if(monster.alive && distPlayerMonster() < player.r + monster.r + 26){
+        monster.hp -= Math.floor(player.atk * 1.6);
+        spawnParticles(monster.x, monster.y, 'rgba(255,190,100,0.95)', 18);
+        playSound(540,0.08,'sawtooth',0.06);
+      } else playSound(420,0.06,'sine',0.03);
+    } else playSound(220,0.06,'sine',0.02);
+  } else if(k===2){
+    if(player.cooldowns.skill2 <= 0 && player.ep >= 26){
+      player.ep -= 26; player.cooldowns.skill2 = 7.0;
+      const radius = 160;
+      if(monster.alive && Math.hypot(monster.x-player.x, monster.y-player.y) <= radius){
+        monster.hp -= Math.floor(player.atk * 2.4);
+        spawnParticles(monster.x,monster.y,'rgba(170,230,255,0.95)',28,48);
+        playSound(720,0.12,'triangle',0.08);
+      } else playSound(420,0.06,'sine',0.03);
+    } else playSound(220,0.06,'sine',0.02);
+  } else if(k==='ult'){
+    if(player.cooldowns.ult <= 0 && player.ep >= 60){
+      player.ep -= 60; player.cooldowns.ult = 18;
+      if(monster.alive){
+        monster.hp -= Math.floor(player.atk * 5 + 8);
+        spawnParticles(monster.x,monster.y,'rgba(255,120,180,0.96)',80,110);
+        cameraShake(14, 420);
+        playSound(220,0.5,'sine',0.16);
+      } else playSound(420,0.06,'sine',0.03);
+    } else playSound(220,0.06,'sine',0.02);
+  }
+}
+
+/* attack button */
+document.getElementById('attackBtn').addEventListener('pointerdown', ()=>{
+  if(monster.alive && Math.hypot(player.x - monster.x, player.y - monster.y) < player.r + monster.r + 28){
+    monster.hp -= player.atk;
+    spawnParticles(monster.x, monster.y, 'rgba(255,200,120,0.95)', 12);
+    playSound(480,0.06,'sawtooth',0.06);
+    if(monster.hp <= 0){ monster.alive = false; onMonsterDie(); }
+  } else playSound(380,0.04,'sine',0.03);
+});
+
+/* skill buttons */
+document.getElementById('skill1').addEventListener('pointerdown', ()=> triggerSkill(1));
+document.getElementById('skill2').addEventListener('pointerdown', ()=> triggerSkill(2));
+document.getElementById('ultimate').addEventListener('pointerdown', ()=> triggerSkill('ult'));
+
+/* menu open/close */
+document.getElementById('menuBtn').addEventListener('click', ()=> {
+  const modal = document.getElementById('menuModal');
+  modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+});
+document.getElementById('closeMenu').addEventListener('click', ()=> document.getElementById('menuModal').style.display='none');
+
+/* upgrades (demo) */
+document.getElementById('buyAtk').addEventListener('click', ()=> {
+  if(state.gold >= 30){ state.gold -= 30; player.atk += 4; updateUI(); } else alert('Gold kurang (demo)');
+});
+document.getElementById('buyHP').addEventListener('click', ()=> {
+  if(state.gold >= 30){ state.gold -= 30; player.maxHP += 12; player.hp += 12; updateUI(); } else alert('Gold kurang (demo)');
+});
+
+/* spawn next monster */
+function onMonsterDie(){
+  state.kills++; state.gold = (state.gold||0) + Math.max(6, Math.floor(monster.maxHP/8));
+  spawnParticles(monster.x, monster.y, 'rgba(255,255,255,0.95)', 90, 140);
+  setTimeout(()=> {
+    monster = spawnMonster(player.x + rand(180, 360) * (Math.random()<0.5?-1:1), player.y + rand(-120,120));
+    // scale up a bit
+    monster.maxHP = Math.floor(120 + state.level*18 + Math.random()*40);
+    monster.hp = monster.maxHP;
+  }, 1400 + Math.random()*1200);
+  updateUI();
+}
+
+/* camera shake */
+let shakeTimer = 0, shakeIntensity = 0;
+function cameraShake(intensity, ms){
+  shakeIntensity = intensity; shakeTimer = ms;
+}
+
+/* -----------------------
+   Monster AI update
+   ----------------------- */
+function updateMonster(dt){
+  if(!monster.alive) return;
+  const dx = player.x - monster.x, dy = player.y - monster.y;
+  const d = Math.hypot(dx,dy);
+  if(d < 420){
+    const nx = dx / d, ny = dy / d;
+    const sp = monster.speed * (monster.slow? 0.5 : 1);
+    monster.vx = nx * sp; monster.vy = ny * sp;
+    if(d < player.r + monster.r + 22){
+      // attack chance
+      if(Math.random() < 0.02) { player.hp -= monster.atk; playSound(220,0.06,'square',0.08); }
+    }
+  } else {
+    // idle wander
+    if(Math.random() < 0.006) { monster.vx = rand(-0.6,0.6); monster.vy = rand(-0.6,0.6); }
+  }
+  monster.x += monster.vx * dt; monster.y += monster.vy * dt;
+  // status ticks
+  if(monster.burn){ monster.burn--; if(monster.burn % 30 === 0) monster.hp -= 2; }
+  if(monster.hp <= 0 && monster.alive){ monster.alive = false; onMonsterDie(); }
+}
+
+/* -----------------------
+   World & Ground rendering
+   - infinite tiling with variation (grass + stones)
+   ----------------------- */
+function drawGround(){
+  ctx.save();
+  // draw tiles in camera space (parallax)
+  ctx.translate(canvas.clientWidth/2 - cam.x, canvas.clientHeight/2 - cam.y);
+  const tile = 96;
+  const cols = Math.ceil(canvas.clientWidth / tile) + 6;
+  const rows = Math.ceil(canvas.clientHeight / tile) + 6;
+  const startX = Math.floor((cam.x - canvas.clientWidth/2) / tile) * tile - tile*3;
+  const startY = Math.floor((cam.y - canvas.clientHeight/2) / tile) * tile - tile*3;
+
+  for(let i=0;i<cols;i++){
+    for(let j=0;j<rows;j++){
+      const x = startX + i*tile;
+      const y = startY + j*tile;
+      // variation using pseudo-random from coordinates
+      const seed = Math.abs(Math.floor((x*73856093) ^ (y*19349663))) % 100;
+      const hue = 150 + (seed % 40); // greenish
+      // turf color variations
+      ctx.fillStyle = seed % 3 === 0 ? `hsl(${hue} 40% 12%)` : `hsl(${hue} 32% 10%)`;
+      ctx.fillRect(x, y, tile-2, tile-2);
+      // draw few grass blades / stones
+      if(seed % 7 === 0){
+        // stone
+        ctx.fillStyle = `rgba(120,120,120,0.18)`;
+        ctx.beginPath(); ctx.ellipse(x + 18, y + 18, 10, 6, 0, 0, Math.PI*2); ctx.fill();
+      } else if(seed % 5 === 0){
+        // grass clump
+        ctx.fillStyle = `rgba(110,200,130,0.08)`;
+        ctx.beginPath(); ctx.moveTo(x + 12, y + 28); ctx.quadraticCurveTo(x + 18, y + 4, x + 26, y + 28); ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/* -----------------------
+   Render helpers: player, monster, UI bars
+   ----------------------- */
+function drawPlayer(){
+  const sx = player.x - cam.x + canvas.clientWidth/2;
+  const sy = player.y - cam.y + canvas.clientHeight/2;
+  // shadow
+  ctx.save(); ctx.globalAlpha = 0.26; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(sx, sy+22, player.r+12, player.r/2+6, 0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; ctx.restore();
+  // body
+  ctx.fillStyle = '#e6f7ff'; ctx.beginPath(); ctx.arc(sx, sy, player.r, 0, Math.PI*2); ctx.fill();
+  // hands
+  const t = Date.now()/480;
+  const bob = Math.sin(t) * 3;
+  ctx.fillStyle = '#e6f7ff';
+  ctx.beginPath(); ctx.arc(sx - player.r - 10, sy + 6 + bob, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(sx + player.r + 10, sy + 6 - bob, 6, 0, Math.PI*2); ctx.fill();
+  // helm
+  ctx.fillStyle = '#203544'; ctx.beginPath(); ctx.arc(sx, sy-6, player.r*0.62, Math.PI*0.12, Math.PI*0.88); ctx.fill();
+  // aura ring
+  ctx.save(); ctx.globalAlpha = 0.85; ctx.strokeStyle = 'rgba(110,231,255,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy, player.r + 8, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+  // weapon simple line
+  ctx.save(); ctx.strokeStyle = '#cfd8e3'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(sx + player.r + 2, sy - 6); ctx.lineTo(sx + player.r + 34, sy - 16); ctx.stroke(); ctx.restore();
+}
+
+function drawMonster(){
+  if(!monster.alive) return;
+  const sx = monster.x - cam.x + canvas.clientWidth/2;
+  const sy = monster.y - cam.y + canvas.clientHeight/2;
+  // shadow
+  ctx.save(); ctx.globalAlpha = 0.26; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(sx, sy+26, monster.r+16, monster.r/2+10, 0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; ctx.restore();
+  // body gradient + bounce
+  const t = Date.now()/420; const bounce = Math.sin(t) * 6;
+  const g = ctx.createRadialGradient(sx-10, sy-12 + bounce, 2, sx, sy + bounce, monster.r + 30);
+  g.addColorStop(0, '#9fffdc'); g.addColorStop(1, '#5ff8d1');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(sx, sy + bounce, monster.r, monster.r*0.85, 0, 0, Math.PI*2); ctx.fill();
+  // eyes
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx-10, sy-10 + bounce/2, 5,6,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sx+10, sy-10 + bounce/2, 5,6,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#012'; ctx.beginPath(); ctx.ellipse(sx-10, sy-8 + bounce/2, 2.6,3.2,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sx+10, sy-8 + bounce/2, 2.6,3.2,0,0,Math.PI*2); ctx.fill();
+  // glossy
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(sx-14, sy-18 + bounce/2, 10,6,0,0,Math.PI*2); ctx.fill();
+  // hp bar above
+  const barW = 110; const pct = clamp(monster.hp / monster.maxHP, 0, 1);
+  drawRoundedBar(sx - barW/2, sy - monster.r - 22, barW, 12, 'rgba(0,0,0,0.6)', '#ff6b6b', pct);
+}
+
+/* draw rounded bar helper */
+function drawRoundedBar(x,y,w,h,bg,fillColor,pct){
+  ctx.save();
+  ctx.beginPath(); roundRect(ctx, x, y, w, h, 8); ctx.fillStyle = bg; ctx.fill();
+  const innerW = Math.max(0, (w-4) * pct);
+  ctx.beginPath(); roundRect(ctx, x+2, y+2, innerW, h-4, 6); ctx.fillStyle = fillColor; ctx.fill();
+  ctx.restore();
+}
+function roundRect(c,x,y,w,h,r){ c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+
+/* -----------------------
+   Misc helpers
+   ----------------------- */
+function rand(a,b){ return a + Math.random()*(b-a); }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function distPlayerMonster(){ return Math.hypot(player.x - monster.x, player.y - monster.y); }
+
+/* -----------------------
+   Main loop
+   ----------------------- */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now - last)/1000);
+  last = now;
+
+  // movement from input/joystick
+  let mx=0,my=0;
+  if(input.left) mx -= 1;
+  if(input.right) mx += 1;
+  if(input.up) my -= 1;
+  if(input.down) my += 1;
+  if(Math.hypot(mx,my) > 0.001){
+    const len = Math.hypot(mx,my); mx /= len; my /= len;
+    player.vx = mx * player.speed; player.vy = my * player.speed;
+  } else {
+    // friction
+    player.vx *= 0.82; player.vy *= 0.82;
+    if(Math.abs(player.vx) < 0.4) player.vx = 0;
+    if(Math.abs(player.vy) < 0.4) player.vy = 0;
+  }
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  // clamp to big virtual area
+  const margin = 128;
+  player.x = clamp(player.x, margin, Math.max(canvas.clientWidth,1600) - margin);
+  player.y = clamp(player.y, margin, Math.max(canvas.clientHeight,900) - margin);
+
+  // camera follow
+  cam.x += (player.x - cam.x) * 0.12;
+  cam.y += (player.y - cam.y) * 0.12;
+
+  // apply camera shake
+  if(shakeTimer > 0){
+    shakeTimer -= dt*1000;
+    cam.shakeX = (Math.random()*2-1) * shakeIntensity;
+    cam.shakeY = (Math.random()*2-1) * shakeIntensity;
+    if(shakeTimer <= 0){ shakeIntensity = 0; cam.shakeX = cam.shakeY = 0; }
+  } else { cam.shakeX = cam.shakeY = 0; }
+
+  // update monster AI
+  updateMonster(dt);
+
+  // cooldowns and EP regen
+  for(const k in player.cooldowns) player.cooldowns[k] = Math.max(0, player.cooldowns[k] - dt);
+  player.ep = clamp(player.ep + player.regenEP * dt, 0, player.maxEP);
+
+  // update particles
+  updateParticles();
+
+  // draw scene
+  render();
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* -----------------------
+   Render function
+   ----------------------- */
+function render(){
+  // clear with background gradient
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0); // reset
+  ctx.fillStyle = '#041826'; ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  // translate for camera and shake
+  ctx.translate(cam.shakeX, cam.shakeY);
+
+  // ground
+  drawGround();
+
+  // monster and player
+  drawMonster();
+  drawPlayer();
+
+  // particles
+  drawParticles();
+
+  ctx.restore();
+
+  // DOM HUD updates
+  document.getElementById('playerHP').style.width = `${clamp(player.hp/player.maxHP*100,0,100)}%`;
+  document.getElementById('playerEP').style.width = `${clamp(player.ep/player.maxEP*100,0,100)}%`;
+  document.getElementById('uiLevel').textContent = state.level;
+  document.getElementById('uiGold').textContent = state.gold;
+  document.getElementById('killCounter').textContent = 'Monsters defeated: ' + state.kills;
+
+  // cooldown overlays
+  const cd1 = player.cooldowns.skill1, cd2 = player.cooldowns.skill2, cd3 = player.cooldowns.ult;
+  const btn1 = document.getElementById('skill1'), btn2 = document.getElementById('skill2'), btn3 = document.getElementById('ultimate');
+  const overlay1 = document.getElementById('cd1'), overlay2 = document.getElementById('cd2'), overlay3 = document.getElementById('cd3');
+  if(cd1>0){ btn1.classList.add('cool'); overlay1.style.clipPath = `inset(${(1 - clamp(cd1/3.2,0,1))*100}% 0 0 0)`; } else { btn1.classList.remove('cool'); overlay1.style.clipPath='inset(100% 0 0 0)'; }
+  if(cd2>0){ btn2.classList.add('cool'); overlay2.style.clipPath = `inset(${(1 - clamp(cd2/7,0,1))*100}% 0 0 0)`; } else { btn2.classList.remove('cool'); overlay2.style.clipPath='inset(100% 0 0 0)'; }
+  if(cd3>0){ btn3.classList.add('cool'); overlay3.style.clipPath = `inset(${(1 - clamp(cd3/18,0,1))*100}% 0 0 0)`; } else { btn3.classList.remove('cool'); overlay3.style.clipPath='inset(100% 0 0 0)'; }
+}
+
+/* -----------------------
+   Utility: rounded rect draw
+   ----------------------- */
+function roundRectPath(c,x,y,w,h,r){ c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+
+/* -----------------------
+   Save/load
+   ----------------------- */
+const SAVE_KEY = 'tapmon_alfi2_5d_v1';
+function saveState(){
+  try{
+    const s = { state, player: { hp: player.hp, maxHP: player.maxHP, ep: player.ep, atk: player.atk }, gold: state.gold };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+  }catch(e){}
+}
+function loadState(){
+  try{
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY)||'{}');
+    if(s.player){ player.hp = s.player.hp || player.hp; player.maxHP = s.player.maxHP || player.maxHP; player.ep = s.player.ep || player.ep; player.atk = s.player.atk || player.atk; }
+    state.gold = s.gold || state.gold || 0;
+  }catch(e){}
+}
+loadState();
+setInterval(saveState, 5000);
+
+/* -----------------------
+   Helper: drawRoundedBar (exposed earlier)
+   ----------------------- */
+function drawRoundedBar(x,y,w,h,bg,fillColor,pct){
+  ctx.save();
+  ctx.beginPath(); roundRectPath(ctx, x, y, w, h, 8); ctx.fillStyle = bg; ctx.fill();
+  ctx.beginPath(); roundRectPath(ctx, x+2, y+2, Math.max(0,(w-4)*pct), h-4, 6); ctx.fillStyle = fillColor; ctx.fill();
+  ctx.restore();
+}
+
+/* -----------------------
+   Expose simple world tiles and helper functions used above
+   ----------------------- */
+function roundRect(c,x,y,w,h,r){ c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+
+/* --------------- small helpers to draw ground and random texture (improved) --------------- */
+function drawGround(){
+  ctx.save();
+  ctx.translate(canvas.clientWidth/2 - cam.x, canvas.clientHeight/2 - cam.y);
+  const tile = 112;
+  const cols = Math.ceil(canvas.clientWidth / tile) + 6;
+  const rows = Math.ceil(canvas.clientHeight / tile) + 6;
+  const startX = Math.floor((cam.x - canvas.clientWidth/2) / tile) * tile - tile*3;
+  const startY = Math.floor((cam.y - canvas.clientHeight/2) / tile) * tile - tile*3;
+  for(let i=0;i<cols;i++){
+    for(let j=0;j<rows;j++){
+      const x = startX + i*tile; const y = startY + j*tile;
+      // use deterministic pseudo-rand for tile variation
+      const seed = Math.abs(((x*374761393) ^ (y*668265263)) % 100);
+      const baseHue = 155 + (seed % 28);
+      ctx.fillStyle = seed % 4 === 0 ? `hsl(${baseHue} 38% 10%)` : `hsl(${baseHue} 28% 8%)`;
+      ctx.fillRect(x, y, tile-2, tile-2);
+      // texture: stones or grass blades
+      if(seed % 6 === 0){
+        ctx.fillStyle = 'rgba(110,110,110,0.12)'; ctx.beginPath(); ctx.ellipse(x + 18, y + 18, 12, 8, 0, 0, Math.PI*2); ctx.fill();
+      } else if(seed % 5 === 0){
+        ctx.fillStyle = 'rgba(110,200,130,0.06)'; ctx.beginPath(); ctx.moveTo(x + 12, y + 28); ctx.quadraticCurveTo(x + 18, y + 8, x + 26, y + 28); ctx.fill();
+      } else {
+        // small random grass strokes
+        const blades = 1 + (seed % 3);
+        ctx.strokeStyle = 'rgba(120,210,140,0.035)'; ctx.lineWidth = 1;
+        for(let b=0;b<blades;b++){
+          const gx = x + 10 + b*10 + (seed % 7);
+          const gy = y + 24;
+          ctx.beginPath(); ctx.moveTo(gx, gy); ctx.quadraticCurveTo(gx+4, gy-18, gx+8, gy); ctx.stroke();
+        }
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/* -----------------------
+   Misc utility: small dist
+   ----------------------- */
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+/* -----------------------
+   Make sure canvas sizing after loading
+   ----------------------- */
+setTimeout(()=> fitCanvas(), 120);
+
+/* -----------------------
+   Expose simple debug helper
+   ----------------------- */
+window.addGold = n => { state.gold = (state.gold||0) + n; updateUI(); };
+function updateUI(){ document.getElementById('uiLevel').textContent = state.level; document.getElementById('uiGold').textContent = state.gold; document.getElementById('killCounter').textContent = 'Monsters defeated: ' + state.kills; }
+
+/* -----------------------
+   Done.
+   ----------------------- */
+</script>
+</body>
+</html>
